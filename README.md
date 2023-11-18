@@ -1,12 +1,37 @@
-# base-API-script
-This repo can be used as a starting point for developing a Python script that utilizes the Plextrac API in some way. It acts as a mini framework with some helpful utilities that make endpoint calls easier. These utilities include a logger, authentication handler, API wrapper library that stores endpoint URLs, and other general utility function that revolve around user inputs, data sanitization, and data validation.
+# writeup-csv-export
+This Python script is designed for interacting with the writeupsDB in Plextrac. It will export all writeups in a selected Writeups Repository to a CSV. The CSV export feature allows for easy backups, bulk updates via re-import, and data transfer between Plextrac repositories.
 
-To get started make a copy of this repo and read through the main.py file which goes more in-depth about the utilities available. You can also run the script with the instructions below to see the output of the examples used when describing the utilities available. Once you know what's available, you can remove the examples, and start writing your script in the main.py file.
+### De-Duplication Issue
+While writeup repositories allow multiple writeups with the same name, the writeup CSV import process currently de-duplicates writeups on import. If you try to import a CSV with multiple rows sharing the same title, only the last row will be added as a writeup.
+
+### Important Consideration for CSV Re-Import: Custom Fields
+Note that the writeup custom fields are integral to Plextrac's CSV schema during the import process. Each custom field column in the CSV corresponds to the addition of a custom field for every writeup created through the import. It's essential to be cautious during re-import, especially when dealing with repositories where not all writeups share the same set of custom fields. This script exports all custom fields for each writeup, which, if not consistent across the repository, may result in the addition of blank custom fields during re-import. Refer to the example below to understand how this could impact the re-import process.
+
+#### Original Writeup Repository in Plextrac
+ - Writeup 1
+   - Custom Impact Field
+ - Writeup 2
+   - Custom Exploitability Field
+
+#### CSV Created from Original Repository
+```
+title     | ... | Custom Impact Field | Custom Exploitability Field | ...
+Writeup 1 | ... | impact value        |                             | ...
+Writeup 2 | ... |                     | exploitability value        | ...
+```
+
+#### Writeup Repository from Imported CSV
+ - Writeup 1
+   - Custom Impact Field
+   - Custom Exploitability Field
+ - Writeup 2
+   - Custom Impact Field
+   - Custom Exploitability Field
 
 # Requirements
 - [Python 3+](https://www.python.org/downloads/)
 - [pip](https://pip.pypa.io/en/stable/installation/)
-- [pipenv](https://pipenv.pypa.io/en/latest/install/)
+- [pipenv](https://pipenv.pypa.io/en/latest/)
 
 # Installing
 After installing Python, pip, and pipenv, run the following commands to setup the Python virtual environment.
@@ -38,7 +63,8 @@ The following values can either be added to the `config.yaml` file or entered wh
 - Password
 
 ## Script Execution Flow
-- Starts executing the main.py file
-- Prints script info stored in settings.py
-- Reads in values from config.yaml file
-- Goes through list of examples to show the user current functionality that can be utilized
+- Authenticates user to provided instance of Plextrac
+- Pulls writeup repository data from your instance
+- Prompts user to select a writeups repository to export to CSV
+- Pulls all writeup information from selected repository
+- Parses writeup data and saves in CSV 
