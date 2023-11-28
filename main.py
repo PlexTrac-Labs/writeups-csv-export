@@ -85,7 +85,7 @@ if __name__ == '__main__':
     # prompt user to select a repo for export
     while True:
         choice = get_writeup_choice(repos)
-        if input.continue_anyways(f'Export {repos[choice-1]["writeupsCount"]} writeup(s) from \'{repos[choice-1]["name"]}\' to CSV?'):
+        if input.continue_anyways(f'Export {repos[choice]["writeupsCount"]} writeup(s) from \'{repos[choice]["name"]}\' to CSV?'):
             break
     selected_repo = repos[choice]
 
