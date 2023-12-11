@@ -29,7 +29,7 @@ def get_writeup_choice(repos) -> int:
 
 def get_all_writeup_custom_fields(writeups) -> list[str]:
     """
-    Creates a unique list of writeup custom field labels from all writeups in
+    Creates a unique list of writeup custom field labels from all writeups in selected repository
 
     :param writeups: List of writesups from the GET List Writeups endpoint
     :type writeups: list[writeup objects]
@@ -200,8 +200,8 @@ if __name__ == '__main__':
             has_custom_field = False
             for field_key, field_data in writeup.get('fields', {}).items():
                 if field_data.get('label') == label:
-                    custom_fields_values.append(field_data['value'])
-                    has_custom_field = True # TODO check bool has correct scope in for loop
+                    custom_fields_values.append(field_data.get('value', ""))
+                    has_custom_field = True
             if not has_custom_field:
                 custom_fields_values.append("")
         # cvss fields
