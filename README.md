@@ -1,9 +1,6 @@
 # writeup-csv-export
 This Python script is designed for interacting with the writeupsDB in Plextrac. It will export all writeups in a selected Writeups Repository to a CSV. The CSV export feature allows for easy backups, bulk updates via re-import, and data transfer between Plextrac repositories.
 
-### De-Duplication Issue
-While writeup repositories allow multiple writeups with the same name, the writeup CSV import process currently de-duplicates writeups on import. If you try to import a CSV with multiple rows sharing the same title, only the last row will be added as a writeup.
-
 ### Important Consideration for CSV Re-Import: Custom Fields
 Note that the writeup custom fields are integral to Plextrac's CSV schema during the import process. Each custom field column in the CSV corresponds to the addition of a custom field for every writeup created through the import. It's essential to be cautious during re-import, especially when dealing with repositories where not all writeups share the same set of custom fields. This script exports all custom fields for each writeup, which, if not consistent across the repository, may result in the addition of blank custom fields during re-import. Refer to the example below to understand how this could impact the re-import process.
 
