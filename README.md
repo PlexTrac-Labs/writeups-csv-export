@@ -58,6 +58,7 @@ The following values can either be added to the `config.yaml` file or entered wh
 - PlexTrac Top Level Domain e.g. https://yourapp.plextrac.com
 - Username
 - Password
+- Auth token for SSO
 
 ## Script Execution Flow
 - Authenticates user to provided instance of Plextrac
