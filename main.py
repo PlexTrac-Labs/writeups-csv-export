@@ -1,6 +1,7 @@
 import yaml
 import time
 import csv
+import os
 
 import settings
 import utils.log_handler as logger
@@ -8,6 +9,97 @@ log = logger.log
 from utils.auth_handler import Auth
 import utils.input_utils as input
 import api
+
+
+headers2 = [
+    "score::cvss3",
+    "score::cvss",
+    "score::YourLabel",
+    "cves",
+    "cwes",
+    "score::cvss3.1",
+    "score::cvss4",
+    "score::likelihood_impact",
+]
+
+
+def _score_with_calc(value, calculation) -> str:
+    if value == "" and calculation == "":
+        return ""
+    return f"{value}::{calculation}"
+
+
+def _score_from_fields(score_data) -> str:
+    if not isinstance(score_data, dict):
+        return ""
+    return _score_with_calc(score_data.get("value", ""), score_data.get("calculation", ""))
+
+
+def _score_from_risk(risk_score, key) -> str:
+    if not isinstance(risk_score, dict) or not risk_score.get(key):
+        return ""
+    score_data = risk_score.get(key, {})
+    return _score_with_calc(score_data.get("overall", ""), score_data.get("vector", ""))
+
+
+def _format_likelihood_impact(risk_score, scores) -> str:
+    score_data = {}
+    if isinstance(risk_score, dict):
+        score_data = risk_score.get("likelihood_impact", {})
+    if not isinstance(score_data, dict) and isinstance(scores, dict):
+        score_data = scores.get("likelihood_impact", {})
+    if not isinstance(score_data, dict):
+        return ""
+
+    value = score_data.get("value", "")
+    if isinstance(value, str) and "::" in value:
+        return value
+    if isinstance(value, dict):
+        likelihood = value.get("likelihood", "")
+        impact = value.get("impact", "")
+        if likelihood != "" or impact != "":
+            return f"{likelihood}::{impact}"
+
+    likelihood = score_data.get("likelihood", "")
+    impact = score_data.get("impact", "")
+    if likelihood != "" or impact != "":
+        return f"{likelihood}::{impact}"
+
+    calculation = score_data.get("calculation", "")
+    if isinstance(calculation, str) and "::" in calculation:
+        return calculation
+    return ""
+
+
+def _general_score(scores) -> str:
+    if not isinstance(scores, dict):
+        return ""
+    return _score_from_fields(scores.get("general", {}))
+
+
+def build_score_fields(writeup) -> list[str]:
+    risk_score = writeup.get("risk_score", {})
+    scores = writeup.get("fields", {}).get("scores", {})
+
+    cvss3 = _score_from_fields(scores.get("cvss3", {}))
+    cvss = _score_from_fields(scores.get("cvss", {}))
+    general_score = _general_score(scores)
+    cvss3_1 = _score_from_risk(risk_score, "CVSS3_1")
+    if cvss3_1 == "":
+        cvss3_1 = _score_from_fields(scores.get("cvss3.1", {}))
+    cvss4 = _score_from_risk(risk_score, "CVSS4")
+    if cvss4 == "":
+        cvss4 = _score_from_fields(scores.get("cvss4", {}))
+    likelihood_impact = _format_likelihood_impact(risk_score, scores)
+
+    return [
+        cvss3,
+        cvss,
+        general_score,
+        cvss3_1,
+        cvss4,
+        likelihood_impact,
+    ]
 
 
 def get_writeup_choice(repos) -> int:
@@ -93,7 +185,8 @@ if __name__ == '__main__':
     # set file path for exported CSV
     parser_time_seconds: float = time.time()
     parser_time: str = time.strftime("%Y_%m_%d_%H_%M_%S", time.localtime(parser_time_seconds))
-    FILE_PATH = f'{selected_repo["name"]}_{parser_time}.csv'
+    os.makedirs("exports", exist_ok=True)
+    FILE_PATH = os.path.join("exports", f'{selected_repo["name"]}_{parser_time}.csv')
 
 
     # get all writeups in user selected repo
@@ -187,7 +280,6 @@ if __name__ == '__main__':
     # define headers
     headers1 = ["title", "severity", "description", "recommendations", "references", "tags"]
     custom_fields = get_all_writeup_custom_fields(writeups)
-    headers2 = ["score::cvss3.1", "score::cvss3", "score::cvss", "cves", "cwes"]
 
     # pluck writeup data from API response and format as list for CSV
     csv_writeups = []
@@ -204,24 +296,7 @@ if __name__ == '__main__':
                     has_custom_field = True
             if not has_custom_field:
                 custom_fields_values.append("")
-        # cvss fields
-        cvss3_1 = ""
-        if writeup.get('risk_score', {}).get('CVSS3_1'):
-            cvss3_1_score = writeup['risk_score']['CVSS3_1']['overall']
-            cvss3_1_calc = writeup['risk_score']['CVSS3_1']['vector']
-            cvss3_1 = f'{cvss3_1_score}::{cvss3_1_calc}'
-        cvss3 = ""
-        if writeup.get('fields', {}).get('scores', {}).get('cvss3'):
-            cvss3_score = writeup['fields']['scores']['cvss3'].get('value', "")
-            cvss3_calc = writeup['fields']['scores']['cvss3'].get('calculation', "")
-            if cvss3_score != "" or cvss3_calc != "":
-                cvss3 = f'{cvss3_score}::{cvss3_calc}'
-        cvss = ""
-        if writeup.get('fields', {}).get('scores', {}).get('cvss'):
-            cvss_score = writeup['fields']['scores']['cvss'].get('value', "")
-            cvss_calc = writeup['fields']['scores']['cvss'].get('calculation', "")
-            if cvss_score != "" or cvss_calc != "":
-                cvss = f'{cvss_score}::{cvss_calc}'
+        score_fields = build_score_fields(writeup)
         # CVE and CWE fields
         cves = ""
         if writeup.get('common_identifiers', {}).get('CVE'):
@@ -244,11 +319,14 @@ if __name__ == '__main__':
         ]
         fields_for_csv += custom_fields_values
         fields_for_csv += [
-            cvss3_1,
-            cvss3,
-            cvss,
+            score_fields[0],
+            score_fields[1],
+            score_fields[2],
             cves,
-            cwes
+            cwes,
+            score_fields[3],
+            score_fields[4],
+            score_fields[5],
         ]
         # add writeup to list to be written to csv
         csv_writeups.append(fields_for_csv)

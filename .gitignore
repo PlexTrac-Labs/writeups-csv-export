@@ -1,3 +1,4 @@
 config.yaml
 Pipfile.lock
 __pycache__/
+exports/
