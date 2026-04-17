@@ -111,50 +111,56 @@ class Auth():
         log.info('---Starting Authorization---')
 
         self.handle_instance_url()
-
-        if self.username == None:
-            self.username = input.prompt_user("Please enter your PlexTrac username")
-        else:
-            log.info(f'Using username from config...')
-        if self.password == None:
-            self.password = getpass(prompt="Password: ")
-        else:
-            log.info(f'Using password from config...')
-        
-        authenticate_data = {
-            "username": self.username,
-            "password": self.password
-        }
-        
-        response = api._authentication.authenticate.authentication(self.base_url, self.auth_headers, authenticate_data)
-        
-        # the following conditional can fail due to:
-        # - invalid credentials
-        # - if the instance is setup to requre mfa and use user does not have mfa setup
-        # - other
-        # the api response is purposely non-descript to prevent gaining information about the authentication process
-        if response.json.get('status') != "success":
-            if input.retry("Could not authenticate with entered credentials."):
-                self.username = None
-                self.password = None
-                self.tenant_id = None
-                return self.handle_authentication()
-        
-        self.tenant_id = response.json.get('tenant_id')
-
-        if response.json.get('mfa_enabled'):
-            log.info('MFA detected for user')
-
-            mfa_auth_data = {
-                "code": response.json.get('code'),
-                "token": input.prompt_user("Please enter your 6 digit MFA code")
-            }
+        log.info(f'Available login method:\n1. Username & Password\n2. Auth Token')
+        method = input.prompt_user("Please choose which method to use for login(1 or 2)")
+        if method == "1":
+            if self.username == None:
+                self.username = input.prompt_user("Please enter your PlexTrac username")
+            else:
+                log.info(f'Using username from config...')
+            if self.password == None:
+                self.password = getpass(prompt="Password: ")
+            else:
+                log.info(f'Using password from config...')
             
-            response = api._authentication.authenticate.multi_factor_authentication(self.base_url, self.auth_headers, mfa_auth_data)
+            authenticate_data = {
+                "username": self.username,
+                "password": self.password
+            }
+            response = api._authentication.authenticate.authentication(self.base_url, self.auth_headers, authenticate_data)
+            # the following conditional can fail due to:
+            # - invalid credentials
+            # - if the instance is setup to requre mfa and use user does not have mfa setup
+            # - other
+            # the api response is purposely non-descript to prevent gaining information about the authentication process
             if response.json.get('status') != "success":
-                if input.retry("Invalid MFA Code."):
+                if input.retry("Could not authenticate with entered credentials."):
+                    self.username = None
+                    self.password = None
+                    self.tenant_id = None
                     return self.handle_authentication()
+            
+            self.tenant_id = response.json.get('tenant_id')
 
-        self.add_auth_header(response.json.get('token'))
+            if response.json.get('mfa_enabled'):
+                log.info('MFA detected for user')
+
+                mfa_auth_data = {
+                    "code": response.json.get('code'),
+                    "token": input.prompt_user("Please enter your 6 digit MFA code")
+                }
+                
+                response = api._authentication.authenticate.multi_factor_authentication(self.base_url, self.auth_headers, mfa_auth_data)
+                if response.json.get('status') != "success":
+                    if input.retry("Invalid MFA Code."):
+                        return self.handle_authentication()
+            
+            self.add_auth_header(response.json.get('token'))
+        elif method == "2":
+            auth = input.prompt_user("Insert token")
+            self.add_auth_header(auth)
+        else:
+            log.info(f'Please only choose 1 or 2 for the login method.')
+
         self.time_since_last_auth = time.time()
         log.success('Authenticated')
